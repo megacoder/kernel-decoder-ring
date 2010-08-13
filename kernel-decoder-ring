@@ -1,0 +1,85 @@
+#!/bin/bash
+# Tommy.Reynolds@Oracle.com
+# Takes as arguments a list of kernel versions and outputs their distro release
+# information.  For example:
+# ./distro-decoder-ring kernel-2.6.18-92.el5
+# also something like this:
+# ./distro-decoder-ring 2.6.18-92
+# or even:
+# ./distro-decoder-ring $(rpm -q kernel)
+
+if [ $# -eq 0 ]; then
+	set -- ${@:-$(/bin/rpm -qa 'kernel*' | /usr/bin/xargs -n1 | /bin/sort)}
+fi
+if [ $# -le 1 ]; then
+	multi=
+else
+	multi=yes
+fi
+for k in "$@"; do
+	VENDOR=DUNNO
+	SERIES=DUNNO
+	RELEASE=DUNNO
+	CODENAME=""
+	# Drop any leading "kernel-PAE-" type of stuff up to first digit
+	p=$(echo "${k}" | /bin/sed -e 's;^[-[:alpha:]]*;;')
+	# Inspect the 2.x.xx-x.x[.x.x].* remainder
+	case "${p}" in
+	2.6.9-[0-9][0-9]*.[0-9][0-9]*.[0-9][0-9]*.*	)
+		VENDOR=OEL
+		SERIES=4
+		# Use first digit of errata to get release
+		RELEASE="${p:0:1}"
+		;;
+	2.6.9-*	)
+		VENDOR=RHEL
+		SERIES=4
+		# Use first digit of errata to get release
+		RELEASE="${p:0:1}"
+		;;
+	2.6.18-[0-9][0-9]*.[0-9][0-9]*.[0-9][0-9]*.*	)
+		VENDOR=OEL
+		SERIES=5
+		;;
+	2.6.18-*)
+		VENDOR=RHEL
+		SERIES=5
+		;;
+	esac
+	if [ "${SERIES}" = "5" ]; then
+		v="$( echo ${p:7} | /bin/sed -e 's/[.].*//')"
+		if [ "$v" -ge 8 -a "$v" -lt 53 ]; then
+			RELEASE="/GA"
+			if [ "${VENDOR}" = "RHEL" ]; then
+				CODENAME=" (Tikanga)"
+			else
+				CODENAME=" (Carthage)"
+			fi
+		elif [ "$v" -ge 53 -a "$v" -lt 92 ]; then
+			RELEASE="u1"
+			if [ "${VENDOR}" = "RHEL" ]; then
+				CODENAME=" (Tikanga)"
+			else
+				CODENAME=" (Carthage)"
+			fi
+		elif [ "$v" -ge 92 -a "$v" -lt 128 ]; then
+			RELEASE="u2"
+			if [ "${VENDOR}" = "RHEL" ]; then
+				CODENAME=" (Tikanga)"
+			else
+				CODENAME=" (Carthage)"
+			fi
+		elif [ "$v" -ge 128 -a "$v" -lt 164 ]; then
+			RELEASE="u3"
+			CODENAME=" (Tikanga)"
+		elif [ "$v" -ge 164 -a "$v" -lt 194 ]; then
+			RELEASE="u4"
+			CODENAME=" (Tikanga)"
+		elif [ "$v" -ge 194 -a "$v" -lt 999 ]; then
+			RELEASE="u5"
+			CODENAME=" (Tikanga)"
+		fi
+	fi
+	[ "${multi}" ] && echo -en "${k}\t"
+	echo "${VENDOR}${SERIES}${RELEASE}${CODENAME}"
+done
